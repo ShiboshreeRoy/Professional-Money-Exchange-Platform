@@ -71,6 +71,48 @@ if (isset($_GET['update_status']) && isset($_GET['card_id'])) {
     }
 }
 
+// Handle card deletion
+if (isset($_GET['delete_card']) && $is_super_admin) {
+    $card_id = intval($_GET['delete_card']);
+    
+    // First get card details for logging/commission adjustment
+    $card_data = $conn->query("SELECT * FROM cards WHERE id = $card_id")->fetch_assoc();
+    
+    if ($card_data) {
+        $stmt = $conn->prepare("DELETE FROM cards WHERE id = ?");
+        $stmt->bind_param("i", $card_id);
+        
+        if ($stmt->execute()) {
+            // Also delete any related commissions
+            $stmt_commission = $conn->prepare("DELETE FROM commissions WHERE card_id = ?");
+            $stmt_commission->bind_param("i", $card_id);
+            $stmt_commission->execute();
+            $stmt_commission->close();
+            
+            header('Location: dashboard.php');
+            exit;
+        }
+    }
+}
+
+// Handle adding card to admin inventory
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin_card']) && $is_super_admin) {
+    $card_type = $_POST['card_type'];
+    $amount = floatval($_POST['amount']);
+    $quantity = intval($_POST['quantity']);
+    $sell_price = floatval($_POST['sell_price']);
+    $description = $_POST['description'] ?? '';
+    
+    $stmt = $conn->prepare("INSERT INTO admin_cards (card_type, amount, quantity, sell_price, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+    $stmt->bind_param("sdids", $card_type, $amount, $quantity, $sell_price, $description);
+    
+    if ($stmt->execute()) {
+        header('Location: dashboard.php#buy-from-admin');
+        exit;
+    }
+    $stmt->close();
+}
+
 // Handle user activation/deactivation
 if (isset($_GET['toggle_user']) && $is_super_admin) {
     $user_id = intval($_GET['toggle_user']);
@@ -100,44 +142,58 @@ if (isset($_POST['update_role']) && $is_super_admin) {
 
 // Handle general settings update
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_general_settings']) && $is_super_admin) {
-    $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
-    
     if (isset($_POST['website_name'])) {
-        $stmt->bind_param("ss", $_POST['website_name'], 'website_name');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'website_name'");
+        $stmt->bind_param("s", $_POST['website_name']);
         $stmt->execute();
+        $stmt->close();
     }
     
     if (isset($_POST['website_description'])) {
-        $stmt->bind_param("ss", $_POST['website_description'], 'website_description');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'website_description'");
+        $stmt->bind_param("s", $_POST['website_description']);
         $stmt->execute();
+        $stmt->close();
     }
     
     if (isset($_POST['support_email'])) {
-        $stmt->bind_param("ss", $_POST['support_email'], 'support_email');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'support_email'");
+        $stmt->bind_param("s", $_POST['support_email']);
         $stmt->execute();
+        $stmt->close();
     }
     
     if (isset($_POST['company_address'])) {
-        $stmt->bind_param("ss", $_POST['company_address'], 'company_address');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'company_address'");
+        $stmt->bind_param("s", $_POST['company_address']);
         $stmt->execute();
+        $stmt->close();
     }
     
     if (isset($_POST['company_phone'])) {
-        $stmt->bind_param("ss", $_POST['company_phone'], 'company_phone');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'company_phone'");
+        $stmt->bind_param("s", $_POST['company_phone']);
         $stmt->execute();
+        $stmt->close();
     }
     
     $maintenance_mode = isset($_POST['maintenance_mode']) ? '1' : '0';
-    $stmt->bind_param("ss", $maintenance_mode, 'maintenance_mode');
+    $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'maintenance_mode'");
+    $stmt->bind_param("s", $maintenance_mode);
     $stmt->execute();
+    $stmt->close();
     
     $email_verification = isset($_POST['email_verification']) ? '1' : '0';
-    $stmt->bind_param("ss", $email_verification, 'email_verification');
+    $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'email_verification'");
+    $stmt->bind_param("s", $email_verification);
     $stmt->execute();
+    $stmt->close();
     
     $sms_verification = isset($_POST['sms_verification']) ? '1' : '0';
-    $stmt->bind_param("ss", $sms_verification, 'sms_verification');
+    $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'sms_verification'");
+    $stmt->bind_param("s", $sms_verification);
     $stmt->execute();
+    $stmt->close();
     
     // Handle file uploads for logo and favicon
     if (isset($_FILES['website_logo']) && $_FILES['website_logo']['error'] == 0) {
@@ -154,8 +210,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_general_setting
             $target_path = $upload_dir . $logo_filename;
             
             if (move_uploaded_file($_FILES['website_logo']['tmp_name'], $target_path)) {
-                $stmt->bind_param("ss", $target_path, 'website_logo');
+                $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'website_logo'");
+                $stmt->bind_param("s", $target_path);
                 $stmt->execute();
+                $stmt->close();
             }
         }
     }
@@ -174,8 +232,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_general_setting
             $target_path = $upload_dir . $favicon_filename;
             
             if (move_uploaded_file($_FILES['website_favicon']['tmp_name'], $target_path)) {
-                $stmt->bind_param("ss", $target_path, 'website_favicon');
+                $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'website_favicon'");
+                $stmt->bind_param("s", $target_path);
                 $stmt->execute();
+                $stmt->close();
             }
         }
     }
@@ -186,40 +246,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_general_setting
 
 // Handle platform settings update
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_platform_settings']) && $is_super_admin) {
-    $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
-    
     if (isset($_POST['min_deposit'])) {
-        $stmt->bind_param("ss", $_POST['min_deposit'], 'min_deposit');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'min_deposit'");
+        $stmt->bind_param("s", $_POST['min_deposit']);
         $stmt->execute();
+        $stmt->close();
     }
     
     if (isset($_POST['max_withdrawal'])) {
-        $stmt->bind_param("ss", $_POST['max_withdrawal'], 'max_withdrawal');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'max_withdrawal'");
+        $stmt->bind_param("s", $_POST['max_withdrawal']);
         $stmt->execute();
+        $stmt->close();
     }
     
     if (isset($_POST['commission_rate'])) {
-        $stmt->bind_param("ss", $_POST['commission_rate'], 'commission_rate');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'commission_rate'");
+        $stmt->bind_param("s", $_POST['commission_rate']);
         $stmt->execute();
+        $stmt->close();
     }
     
     $auto_approve_cards = isset($_POST['auto_approve_cards']) ? '1' : '0';
-    $stmt->bind_param("ss", $auto_approve_cards, 'auto_approve_cards');
+    $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'auto_approve_cards'");
+    $stmt->bind_param("s", $auto_approve_cards);
     $stmt->execute();
+    $stmt->close();
     
     if (isset($_POST['terms_url'])) {
-        $stmt->bind_param("ss", $_POST['terms_url'], 'terms_url');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'terms_url'");
+        $stmt->bind_param("s", $_POST['terms_url']);
         $stmt->execute();
+        $stmt->close();
     }
     
     if (isset($_POST['privacy_url'])) {
-        $stmt->bind_param("ss", $_POST['privacy_url'], 'privacy_url');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'privacy_url'");
+        $stmt->bind_param("s", $_POST['privacy_url']);
         $stmt->execute();
+        $stmt->close();
     }
     
     if (isset($_POST['refund_policy'])) {
-        $stmt->bind_param("ss", $_POST['refund_policy'], 'refund_policy');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'refund_policy'");
+        $stmt->bind_param("s", $_POST['refund_policy']);
         $stmt->execute();
+        $stmt->close();
     }
     
     header('Location: dashboard.php');
@@ -228,21 +300,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_platform_settin
 
 // Handle theme settings update
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_theme_settings']) && $is_super_admin) {
-    $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
-    
     if (isset($_POST['website_theme'])) {
-        $stmt->bind_param("ss", $_POST['website_theme'], 'website_theme');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'website_theme'");
+        $stmt->bind_param("s", $_POST['website_theme']);
         $stmt->execute();
+        $stmt->close();
     }
     
     if (isset($_POST['primary_color'])) {
-        $stmt->bind_param("ss", $_POST['primary_color'], 'primary_color');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'primary_color'");
+        $stmt->bind_param("s", $_POST['primary_color']);
         $stmt->execute();
+        $stmt->close();
     }
     
     if (isset($_POST['secondary_color'])) {
-        $stmt->bind_param("ss", $_POST['secondary_color'], 'secondary_color');
+        $stmt = $conn->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = 'secondary_color'");
+        $stmt->bind_param("s", $_POST['secondary_color']);
         $stmt->execute();
+        $stmt->close();
     }
     
     header('Location: dashboard.php');
@@ -402,6 +478,9 @@ while($price = $prices_result->fetch_assoc()) {
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="pricing-settings-tab" data-bs-toggle="tab" data-bs-target="#pricing-settings" type="button" role="tab">Pricing</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="buy-from-admin-tab" data-bs-toggle="tab" data-bs-target="#buy-from-admin" type="button" role="tab">Buy from Admin</button>
             </li>
             <?php if ($is_super_admin): ?>
             <li class="nav-item" role="presentation">
@@ -637,6 +716,8 @@ while($price = $prices_result->fetch_assoc()) {
                                     <th>Amount</th>
                                     <th>Qty</th>
                                     <th>Total</th>
+                                    <th>Payment Method</th>
+                                    <th>Payment Number</th>
                                     <th>Status</th>
                                     <th>Date</th>
                                     <th>Actions</th>
@@ -654,6 +735,8 @@ while($price = $prices_result->fetch_assoc()) {
                                     <td>$<?php echo number_format($card['amount'], 2); ?></td>
                                     <td><?php echo $card['quantity']; ?></td>
                                     <td>$<?php echo number_format($card['total_amount'], 2); ?></td>
+                                    <td><?php echo htmlspecialchars($card['payment_method']); ?></td>
+                                    <td><?php echo htmlspecialchars($card['payment_number']); ?></td>
                                     <td><span class="status-badge status-<?php echo $card['status']; ?>"><?php echo ucfirst($card['status']); ?></span></td>
                                     <td><?php echo date('M j, Y', strtotime($card['created_at'])); ?></td>
                                     <td>
@@ -666,6 +749,7 @@ while($price = $prices_result->fetch_assoc()) {
                                         <?php if($card['status'] === 'approved'): ?>
                                             <a href="?update_status=paid&card_id=<?php echo $card['id']; ?>" class="btn btn-sm btn-info action-btn">Mark Paid</a>
                                         <?php endif; ?>
+                                        <a href="?delete_card=<?php echo $card['id']; ?>" class="btn btn-sm btn-danger action-btn" onclick="return confirm('Are you sure you want to delete this card?')">Delete</a>
                                     </td>
                                 </tr>
                                 <?php endwhile; ?>
@@ -1044,6 +1128,102 @@ while($price = $prices_result->fetch_assoc()) {
                         </div>
                         <button type="submit" class="btn btn-primary">Apply Changes</button>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buy from Admin Tab -->
+        <div class="tab-pane fade" id="buy-from-admin" role="tabpanel">
+            <div class="admin-card">
+                <h3><i class="fas fa-shopping-cart me-2 text-primary"></i>Buy from Admin</h3>
+                <p class="text-muted">Allow users to purchase cards directly from admin inventory</p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="admin-card">
+                            <h4><i class="fas fa-plus-circle me-2 text-success"></i>Add New Card for Sale</h4>
+                            <form method="POST">
+                                <input type="hidden" name="add_admin_card" value="1">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Card Type *</label>
+                                    <select class="form-select" name="card_type" required>
+                                        <option value="">Select Card Type</option>
+                                        <option value="PayPal_USD">PayPal US $</option>
+                                        <option value="PayPal_UK">PayPal UK £</option>
+                                        <option value="Apple_Gift_Card">Apple Gift Card</option>
+                                        <option value="ACH_Bank">ACH Bank Transfer</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Amount per Card ($) *</label>
+                                    <input type="number" step="0.01" class="form-control" name="amount" placeholder="Enter amount" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Quantity Available *</label>
+                                    <input type="number" class="form-control" name="quantity" placeholder="Number of cards" min="1" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Sell Price per Card ($) *</label>
+                                    <input type="number" step="0.01" class="form-control" name="sell_price" placeholder="Price to sell at" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Description (Optional)</label>
+                                    <textarea class="form-control" name="description" rows="3" placeholder="Additional details about the card"></textarea>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success">Add Card to Inventory</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="admin-card">
+                            <h4><i class="fas fa-list me-2 text-info"></i>Available Cards for Purchase</h4>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Amount</th>
+                                            <th>Available</th>
+                                            <th>Sell Price</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php 
+                                        $admin_cards_result = $conn->query("SELECT * FROM admin_cards ORDER BY created_at DESC");
+                                        if ($admin_cards_result->num_rows > 0):
+                                            while($card = $admin_cards_result->fetch_assoc()):
+                                        ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars(str_replace('_', ' ', $card['card_type'])); ?></td>
+                                            <td>$<?php echo number_format($card['amount'], 2); ?></td>
+                                            <td><?php echo $card['quantity']; ?></td>
+                                            <td>$<?php echo number_format($card['sell_price'], 2); ?></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-primary action-btn">Edit</button>
+                                                <button class="btn btn-sm btn-danger action-btn">Delete</button>
+                                            </td>
+                                        </tr>
+                                        <?php 
+                                            endwhile;
+                                        else:
+                                        ?>
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted">No cards available for purchase</td>
+                                        </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

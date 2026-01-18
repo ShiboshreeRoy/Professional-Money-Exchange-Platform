@@ -12,7 +12,6 @@ require_once 'config/config.php';
 // Get user info
 $user_id = $_SESSION['user_id'];
 $username = $_SESSION['username'];
-$balance = $_SESSION['balance'];
 
 // Get current prices
 $prices_result = $conn->query("SELECT * FROM prices ORDER BY currency_type ASC");
@@ -158,6 +157,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .status-approved { background-color: #d1fae5; color: #059669; }
         .status-rejected { background-color: #fee2e2; color: #dc2626; }
         .status-paid { background-color: #dbeafe; color: #2563eb; }
+        
+        /* Professional Home Button Styling */
+        .btn-home-professional {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
+            color: #2563eb !important;
+            border: 2px solid #2563eb !important;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-home-professional:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+            color: white !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        
+        .btn-home-professional:focus {
+            box-shadow: 0 0 0 0.25rem rgba(37, 99, 235, 0.25);
+        }
     </style>
 </head>
 <body>
@@ -170,6 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <p class="mb-0">Welcome back, <?php echo htmlspecialchars($username); ?>!</p>
                 </div>
                 <div class="col-md-4 text-md-end">
+                    <a href="../index.php" class="btn btn-home-professional me-2" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Return to Homepage"><i class="fas fa-home me-1"></i> Home</a>
                     <a href="notifications.php" class="btn btn-outline-light me-2"><i class="fas fa-bell me-1"></i> Notifications</a>
                     <a href="security.php" class="btn btn-outline-light me-2"><i class="fas fa-shield-alt me-1"></i> Security</a>
                     <a href="contact.php" class="btn btn-outline-light me-2"><i class="fas fa-headset me-1"></i> Support</a>
@@ -236,9 +256,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <label class="form-label">Payment Method *</label>
                                 <select class="form-select" name="payment_method" required>
                                     <option value="">Select Payment Method</option>
+                                    <option value="Bikash">Bikash</option>
+                                    <option value="Nagad">Nagad</option>
+                                    <option value="Rocket">Rocket</option>
+                                    <option value="PayPal">PayPal</option>
+                                    <option value="Apple Cash">Apple Cash</option>
                                     <option value="Bank Transfer">Bank Transfer</option>
-                                    <option value="Mobile Banking">Mobile Banking</option>
-                                    <option value="Cash">Cash</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
@@ -384,6 +407,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             // Initial calculation
             calculateTotal();
+        });
+        
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
         });
     </script>
 </body>
