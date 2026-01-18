@@ -26,6 +26,17 @@ $paypal_uk = $prices['PayPal_UK'] ?? 113.00;
 $apple_gift = $prices['Apple_Gift_Card'] ?? 104.00;
 $ach_bank = $prices['ACH_Bank'] ?? 115.00;
 
+// Get real-time statistics
+$total_users_result = $conn->query("SELECT COUNT(*) as count FROM users WHERE is_active = 1");
+$total_users = $total_users_result->fetch_assoc()['count'] ?? 0;
+
+$total_traded_result = $conn->query("SELECT SUM(total_amount) as total FROM cards WHERE status = 'paid'");
+$total_traded = $total_traded_result->fetch_assoc()['total'] ?? 0;
+
+// Format stats for display
+$happy_customers = $total_users > 500 ? $total_users : 500; // Minimum 500
+$total_traded_formatted = $total_traded > 250000 ? number_format($total_traded) : '250K+';
+
 $conn->close();
 ?>
 
@@ -124,22 +135,59 @@ $conn->close();
             color: white;
             padding: 40px 0 20px;
         }
+        .navbar-nav .nav-link.active {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+        .navbar-nav .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+        }
+        @media (max-width: 991.98px) {
+            .navbar-nav {
+                text-align: center;
+                padding: 10px 0;
+            }
+            .navbar-nav .nav-item {
+                margin: 5px 0;
+            }
+        }
     </style>
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
         <div class="container">
             <a class="navbar-brand" href="#">
                 <i class="fas fa-exchange-alt me-2"></i>CardExchange
             </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="#">Home</a>
-                <a class="nav-link" href="#features">Features</a>
-                <a class="nav-link" href="#rates">Rates</a>
-                <a class="nav-link" href="login.php">
-                    <i class="fas fa-sign-in-alt me-1"></i>Login
-                </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="fas fa-home me-1"></i>Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#features"><i class="fas fa-star me-1"></i>Features</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#carousel"><i class="fas fa-images me-1"></i>Offers</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#rates"><i class="fas fa-money-bill-wave me-1"></i>Rates</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user me-1"></i>Account
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="login.php"><i class="fas fa-sign-in-alt me-2"></i>Login</a></li>
+                            <li><a class="dropdown-item" href="register.php"><i class="fas fa-user-plus me-2"></i>Register</a></li>
+                        </ul>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
@@ -166,13 +214,13 @@ $conn->close();
             <div class="row">
                 <div class="col-md-3 col-6">
                     <div class="stat-item">
-                        <div class="stat-number">500+</div>
+                        <div class="stat-number"><?php echo $happy_customers; ?>+</div>
                         <div>Happy Customers</div>
                     </div>
                 </div>
                 <div class="col-md-3 col-6">
                     <div class="stat-item">
-                        <div class="stat-number">$250K+</div>
+                        <div class="stat-number">$<?php echo $total_traded_formatted; ?>+</div>
                         <div>Traded</div>
                     </div>
                 </div>
@@ -408,5 +456,54 @@ $conn->close();
 
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+                
+                // Close mobile menu after clicking
+                const navbarCollapse = document.querySelector('.navbar-collapse');
+                const bsCollapse = new bootstrap.Collapse(navbarCollapse, {
+                    toggle: false
+                });
+                bsCollapse.hide();
+            });
+        });
+        
+        // Add active class to navbar items based on scroll position
+        window.addEventListener('scroll', function() {
+            const sections = ['#features', '#carousel', '#rates'];
+            const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
+            
+            let current = '';
+            
+            sections.forEach(section => {
+                const element = document.querySelector(section);
+                if (element) {
+                    const sectionTop = element.offsetTop - 100;
+                    if (pageYOffset >= sectionTop) {
+                        current = section;
+                    }
+                }
+            });
+            
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
